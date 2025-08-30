@@ -14,8 +14,6 @@ import {
 import {
   MoreOutlined,
   EyeOutlined,
-  EditOutlined,
-  CheckOutlined,
 } from "@ant-design/icons";
 import type { TableProps, MenuProps } from "antd";
 import axios from "axios";
@@ -83,9 +81,20 @@ export default function Tickets() {
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      console.log("🔄 Fetching tickets from API...");
+      const encryptedUserData = localStorage.getItem("userData");
+      if (!encryptedUserData) {
+        setLoading(false);
+        return;
+      }
+      const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+      const userId = decryptedUserData.id;
+
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
       const response = await axios.get(
-        apiUrl(API_CONFIG.ENDPOINTS.AUTH.GetTickets)
+        apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.getTickets}${userId}`)
       );
 
       console.log("✅ Tickets fetched successfully:", response.data);
@@ -175,129 +184,6 @@ export default function Tickets() {
     }
   };
 
-  // Handle update ticket - only for open tickets
-  const handleUpdateClick = (ticket: Ticket) => {
-    if (ticket.status === "closed") {
-      notification.warning({
-        message: "Update Restricted",
-        description: "Cannot update closed tickets",
-      });
-      return;
-    }
-
-    console.log("✏️ Opening update modal for ticket:", ticket);
-    setSelectedTicket(ticket);
-    form.setFieldsValue({
-      subject: ticket.subject,
-      description: ticket.description,
-      priority: ticket.priority,
-      status: ticket.status,
-      reply: "", // Initialize reply field as empty
-    });
-    setUpdateModalVisible(true);
-  };
-
-  // Close ticket
-  const handleCloseTicket = async (ticket: Ticket) => {
-    try {
-      const ticketId = ticket._id || ticket.id;
-      console.log("🔄 Closing ticket:", ticketId);
-
-      const payload = {
-        status: "closed", // Dynamic status - always closed for this action
-        updatedAt: new Date().toISOString(),
-      };
-
-      console.log("🔄 Sending close payload to API:", payload);
-
-      const response = await axios.patch(
-        apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.UpdateTicket}${ticketId}/status`),
-        payload
-      );
-
-      console.log("✅ Ticket closed successfully:", response.data);
-
-      // Success notification
-      notification.success({
-        message: "Ticket Closed",
-        description: "Ticket has been closed successfully",
-        duration: 4.5,
-      });
-
-      await fetchTickets();
-    } catch (error) {
-      console.error("❌ Error closing ticket:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("📋 Error response:", error.response?.data);
-        console.error("📊 Error status:", error.response?.status);
-
-        notification.error({
-          message: "Close Failed",
-          description:
-            error.response?.data?.message || "Failed to close ticket",
-          duration: 5,
-        });
-      } else {
-        notification.error({
-          message: "Close Failed",
-          description: "An unexpected error occurred while closing the ticket",
-          duration: 5,
-        });
-      }
-    }
-  };
-
-  // Reopen ticket
-  const handleReopenTicket = async (ticket: Ticket) => {
-    try {
-      const ticketId = ticket._id || ticket.id;
-      console.log("🔄 Reopening ticket:", ticketId);
-
-      const payload = {
-        status: "open",
-        updatedAt: new Date().toISOString(),
-      };
-
-      console.log("🔄 Sending reopen payload to API:", payload);
-
-      const response = await axios.patch(
-        apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.UpdateTicket}${ticketId}/status`),
-        payload
-      );
-
-      console.log("✅ Ticket reopened successfully:", response.data);
-
-      // Success notification
-      notification.success({
-        message: "Ticket Reopened",
-        description: "Ticket has been reopened successfully",
-        duration: 4.5,
-      });
-
-      await fetchTickets();
-    } catch (error) {
-      console.error("❌ Error reopening ticket:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("📋 Error response:", error.response?.data);
-        console.error("📊 Error status:", error.response?.status);
-
-        notification.error({
-          message: "Reopen Failed",
-          description:
-            error.response?.data?.message || "Failed to reopen ticket",
-          duration: 5,
-        });
-      } else {
-        notification.error({
-          message: "Reopen Failed",
-          description:
-            "An unexpected error occurred while reopening the ticket",
-          duration: 5,
-        });
-      }
-    }
-  };
-
   // Handle view ticket
   const handleViewTicket = (ticket: Ticket) => {
     console.log("👁️ Viewing ticket:", ticket);
@@ -313,31 +199,6 @@ export default function Tickets() {
       label: "View",
       onClick: () => handleViewTicket(record),
     },
-    // Show update option for open tickets
-    ...(record.status === "open"
-      ? [
-          {
-            key: "update",
-            icon: <EditOutlined />,
-            label: "Update",
-            onClick: () => handleUpdateClick(record),
-          },
-          {
-            key: "close",
-            icon: <CheckOutlined />,
-            label: "Close",
-            onClick: () => handleCloseTicket(record),
-          },
-        ]
-      : [
-          // Show reopen option for closed tickets
-          {
-            key: "reopen",
-            icon: <EditOutlined />,
-            label: "Reopen",
-            onClick: () => handleReopenTicket(record),
-          },
-        ]),
   ];
 
   // Update the date rendering to handle the full ISO format
@@ -467,6 +328,18 @@ export default function Tickets() {
 
     setLoading(true);
     try {
+      const encryptedUserData = localStorage.getItem("userData");
+      if (!encryptedUserData) {
+        setLoading(false);
+        return;
+      }
+      const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+      const userId = decryptedUserData.id;
+
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
       const fullName = `${userData.firstName} ${userData.lastName}`;
       const payload = {
         ...values,
@@ -474,17 +347,12 @@ export default function Tickets() {
         email: userData.email,
         role: userData.role,
         status: "open",
+        userId: userId,
       };
 
       const response = await axios.post(
-        apiUrl(API_CONFIG.ENDPOINTS.AUTH.GetTickets),
-        payload,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        apiUrl(API_CONFIG.ENDPOINTS.AUTH.createTickets),
+        payload
       );
 
       if (response.data) {
