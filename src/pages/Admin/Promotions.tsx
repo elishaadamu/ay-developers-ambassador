@@ -12,6 +12,7 @@ import {
   Tabs,
   Badge,
   message,
+  Switch,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import axios from "axios";
@@ -27,22 +28,85 @@ interface Product {
   price: number;
 }
 
+interface UserData {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+type SaleStatus = "pending" | "approved" | "rejected";
+
+interface Sale {
+  _id: string;
+  productId: Product;
+  quantity: number;
+  transactionReference: string;
+  status: SaleStatus;
+  createdAt: string;
+}
+
+// 🔑 Convert file -> base64 (moved outside component to prevent re-creation)
+const getBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+
+// 📊 Table columns (moved outside component to prevent re-creation)
+const submissionColumns = [
+  {
+    title: "Product",
+    dataIndex: "productName",
+    key: "productName",
+    render: (_: any, record: Sale) => record.productId?.name,
+  },
+  { title: "Quantity", dataIndex: "quantity", key: "quantity" },
+  {
+    title: "Transaction Ref",
+    dataIndex: "transactionReference",
+    key: "transactionReference",
+  },
+  {
+    title: "Amount",
+    dataIndex: "amount",
+    key: "amount",
+    render: (_: any, record: Sale) => record.productId?.price,
+  },
+  {
+    title: "Status",
+    dataIndex: "status",
+    key: "status",
+    render: (status: SaleStatus) => (
+      <Badge
+        status={
+          status === "approved"
+            ? "success"
+            : status === "rejected"
+            ? "error"
+            : "processing"
+        }
+        text={status ? status.charAt(0).toUpperCase() + status.slice(1) : ""}
+      />
+    ),
+  },
+  {
+    title: "Date",
+    dataIndex: "createdAt",
+    key: "createdAt",
+    render: (date: string) => new Date(date).toLocaleDateString(),
+  },
+];
+
 export default function Promotions() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [sales, setSales] = useState<any[]>([]);
-  const [userData, setUserData] = useState<any>(null);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [paymentReceipt, setPaymentReceipt] = useState<string>("");
-
-  // 🔑 Convert file -> base64
-  const getBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
+  const [mode, setMode] = useState<"submission" | "view">("submission");
 
   // 🔑 Decrypt user from localStorage
   useEffect(() => {
@@ -71,7 +135,7 @@ export default function Promotions() {
       setProducts(sorted);
     } catch (error) {
       console.error("❌ Error fetching products:", error);
-      message.error("Failed to fetch products");
+      toast.error("Failed to fetch products");
       setProducts([]);
     } finally {
       setLoading(false);
@@ -146,51 +210,6 @@ export default function Promotions() {
   const approvedSales = sales.filter((s) => s.status === "approved");
   const rejectedSales = sales.filter((s) => s.status === "rejected");
 
-  // 📊 Table columns
-  const submissionColumns = [
-    {
-      title: "Product",
-      dataIndex: "productName",
-      key: "productName",
-      render: (_: any, record: any) => record.productId?.name,
-    },
-    { title: "Quantity", dataIndex: "quantity", key: "quantity" },
-    {
-      title: "Transaction Ref",
-      dataIndex: "transactionReference",
-      key: "transactionReference",
-    },
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      key: "amount",
-      render: (_: any, record: any) => record.productId?.price,
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      render: (status: string) => (
-        <Badge
-          status={
-            status === "approved"
-              ? "success"
-              : status === "rejected"
-              ? "error"
-              : "processing"
-          }
-          text={status ? status.charAt(0).toUpperCase() + status.slice(1) : ""}
-        />
-      ),
-    },
-    {
-      title: "Date",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      render: (date: any) => new Date(date).toLocaleDateString(),
-    },
-  ];
-
   return (
     <>
       <PageMeta
@@ -202,122 +221,134 @@ export default function Promotions() {
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <ToastContainer position="top-right" autoClose={3000} />
 
-        <Tabs defaultActiveKey="submit">
-          {/* Submit Sale */}
-          <TabPane tab="Submit Sale" key="submit">
-            <Form
-              form={form}
-              layout="vertical"
-              className="max-w-2xl mx-auto"
-              onFinish={postSales}
+        <div className="mb-6 flex items-center justify-center gap-4">
+          <span className={mode === "view" ? "font-semibold" : ""}>
+            View Sales
+          </span>
+          <Switch
+            checked={mode === "submission"}
+            onChange={(checked) => setMode(checked ? "submission" : "view")}
+          />
+          <span className={mode === "submission" ? "font-semibold" : ""}>
+            Manual Submission
+          </span>
+        </div>
+
+        {mode === "submission" ? (
+          <Form
+            form={form}
+            layout="vertical"
+            className="mx-auto max-w-2xl"
+            onFinish={postSales}
+          >
+            {/* Product select */}
+            <Form.Item
+              name="products"
+              label="Select Products"
+              rules={[{ required: true, message: "Please select products" }]}
             >
-              {/* Product select */}
-              <Form.Item
-                name="products"
-                label="Select Products"
-                rules={[{ required: true, message: "Please select products" }]}
+              <Select placeholder="Select products" className="w-full">
+                {products.map((product) => (
+                  <Select.Option key={product._id} value={product._id}>
+                    {product.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            {/* Quantity */}
+            <Form.Item
+              name="quantity"
+              label="Quantity"
+              rules={[{ required: true, message: "Please enter quantity" }]}
+            >
+              <InputNumber min={1} className="w-full" />
+            </Form.Item>
+
+            {/* Transaction Reference */}
+            <Form.Item
+              name="transactionReference"
+              label="Transaction Reference"
+              rules={[
+                {
+                  required: true,
+                  message: "Please enter transaction reference",
+                },
+              ]}
+            >
+              <Input placeholder="Enter transaction reference" />
+            </Form.Item>
+
+            {/* Upload Receipt */}
+            <Form.Item
+              name="paymentReceipt"
+              label="Upload Payment Receipt"
+              rules={[{ required: true, message: "Please upload receipt" }]}
+            >
+              <Upload
+                listType="picture"
+                beforeUpload={async (file) => {
+                  const isLt50KB = file.size / 1024 < 50;
+                  if (!isLt50KB) {
+                    toast.error("❌ File size must be less than 50KB");
+                    return Upload.LIST_IGNORE;
+                  }
+                  const base64 = await getBase64(file);
+                  setPaymentReceipt(base64);
+                  return false;
+                }}
+                accept="image/*"
+                maxCount={1}
               >
-                <Select placeholder="Select products" className="w-full">
-                  {products.map((product) => (
-                    <Select.Option key={product._id} value={product._id}>
-                      {product.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
+                <Button icon={<UploadOutlined />}>Click to Upload</Button>
+              </Upload>
+            </Form.Item>
 
-              {/* Quantity */}
-              <Form.Item
-                name="quantity"
-                label="Quantity"
-                rules={[{ required: true, message: "Please enter quantity" }]}
+            <Form.Item className="mb-0">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                className="w-full"
               >
-                <InputNumber min={1} className="w-full" />
-              </Form.Item>
+                Submit Sale
+              </Button>
+            </Form.Item>
+          </Form>
+        ) : (
+          <Tabs defaultActiveKey="pending">
+            {/* Pending */}
+            <TabPane tab="Pending" key="pending">
+              <Table
+                columns={submissionColumns}
+                dataSource={pendingSales}
+                rowKey="_id"
+                loading={loading}
+              />
+            </TabPane>
 
-              {/* Transaction Reference */}
-              <Form.Item
-                name="transactionReference"
-                label="Transaction Reference"
-                rules={[
-                  {
-                    required: true,
-                    message: "Please enter transaction reference",
-                  },
-                ]}
-              >
-                <Input placeholder="Enter transaction reference" />
-              </Form.Item>
+            {/* Approved */}
+            <TabPane tab="Approved" key="approved">
+              <div className="mb-3 font-semibold"></div>
+              <Table
+                columns={submissionColumns}
+                dataSource={approvedSales}
+                rowKey="_id"
+                loading={loading}
+              />
+            </TabPane>
 
-              {/* Upload Receipt */}
-              <Form.Item
-                name="paymentReceipt"
-                label="Upload Payment Receipt"
-                rules={[{ required: true, message: "Please upload receipt" }]}
-              >
-                <Upload
-                  listType="picture"
-                  beforeUpload={async (file) => {
-                    const isLt50KB = file.size / 1024 < 50;
-                    if (!isLt50KB) {
-                      toast.error("❌ File size must be less than 50KB");
-                      return Upload.LIST_IGNORE;
-                    }
-                    const base64 = await getBase64(file);
-                    setPaymentReceipt(base64);
-                    return false;
-                  }}
-                  accept="image/*"
-                  maxCount={1}
-                >
-                  <Button icon={<UploadOutlined />}>Click to Upload</Button>
-                </Upload>
-              </Form.Item>
-
-              <Form.Item className="mb-0">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  className="w-full"
-                >
-                  Make Payment
-                </Button>
-              </Form.Item>
-            </Form>
-          </TabPane>
-
-          {/* Pending */}
-          <TabPane tab="Pending" key="pending">
-            <Table
-              columns={submissionColumns}
-              dataSource={pendingSales}
-              rowKey="_id"
-              loading={loading}
-            />
-          </TabPane>
-
-          {/* Approved */}
-          <TabPane tab="Approved" key="approved">
-            <div className="mb-3 font-semibold"></div>
-            <Table
-              columns={submissionColumns}
-              dataSource={approvedSales}
-              rowKey="_id"
-              loading={loading}
-            />
-          </TabPane>
-
-          {/* Rejected */}
-          <TabPane tab="Rejected" key="rejected">
-            <Table
-              columns={submissionColumns}
-              dataSource={rejectedSales}
-              rowKey="_id"
-              loading={loading}
-            />
-          </TabPane>
-        </Tabs>
+            {/* Rejected */}
+            <TabPane tab="Rejected" key="rejected">
+              <Table
+                columns={submissionColumns}
+                dataSource={rejectedSales}
+                rowKey="_id"
+                loading={loading}
+              />
+            </TabPane>
+          </Tabs>
+        )}
       </div>
     </>
   );

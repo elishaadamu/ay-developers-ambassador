@@ -11,6 +11,7 @@ import AddUserModal from "./AddUserModal";
 import PerformanceModal from "./PerformanceModal";
 import { apiUrl, API_CONFIG } from "../../utilities/config";
 import { User } from "../../types/user";
+import { decryptData } from "../../utilities/encryption";
 
 dayjs.extend(isBetween);
 
@@ -33,10 +34,25 @@ export default function Customers() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      console.log("🔄 Fetching Customers from API...");
-      const response = await axios.get(
-        apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.GetUsers}`)
-      );
+      const encryptedUserData = localStorage.getItem("userData");
+      if (!encryptedUserData) {
+        message.error("User not authenticated");
+        setLoading(false);
+        return;
+      }
+      const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+      const userId = decryptedUserData.id;
+
+      if (!userId) {
+        message.error("User ID not found");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔄 Fetching Customers from API...", userId);
+      const link = apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.GetUsers}${userId}`);
+      console.log("📎 API Endpoint:", link);
+      const response = await axios.get(link);
 
       console.log("✅ Customers fetched successfully:", response.data);
 
@@ -254,14 +270,7 @@ export default function Customers() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center md:justify-end gap-2 w-full mt-[0px] md:mt-[-20px]">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-[11px] md:text-[14px] font-medium text-white hover:bg-blue-700"
-            >
-              Add Customer
-            </button>
-          </div>
+          <div className="flex flex-wrap justify-center md:justify-end gap-2 w-full mt-[0px] md:mt-[-20px]"></div>
         </div>
 
         <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center">

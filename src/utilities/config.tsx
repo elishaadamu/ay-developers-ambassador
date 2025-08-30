@@ -13,7 +13,7 @@ export const API_CONFIG = {
       DeleteProduct: "/api/products/",
       SuspendUser: "/api/users/suspend/",
       ActivateUser: "/api/users/activate/",
-      GetUsers: "/api/users/",
+      GetUsers: "/api/users/ambassador/",
       UpdateUser: "/api/users/",
       DeleteUser: "/api/users/",
       GetTickets: "/api/tickets",

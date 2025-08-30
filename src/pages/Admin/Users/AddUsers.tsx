@@ -9,6 +9,7 @@ import Input from "../../../components/form/input/InputField";
 import Select from "../../../components/form/Select";
 import { API_CONFIG, apiUrl } from "../../../utilities/config";
 import PageMeta from "../../../components/common/PageMeta";
+import { decryptData } from "../../../utilities/encryption";
 
 interface UserForm {
   firstName: string;
@@ -76,10 +77,7 @@ export default function AddUsers() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Options for role dropdown
-  const roleOptions = [
-    { value: "user", label: "Customer" },
-    { value: "ambassador", label: "Ambassador" },
-  ];
+  const roleOptions = [{ value: "user", label: "Customer" }];
 
   // Fetch states from API
   const getStatesFromApi = async () => {
@@ -329,6 +327,16 @@ export default function AddUsers() {
     const isFormValid = !Object.values(newErrors).some((error) => error);
 
     if (isFormValid) {
+      const encryptedUserData = localStorage.getItem("userData");
+      if (!encryptedUserData) {
+        return;
+      }
+      const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+      const userId = decryptedUserData.id;
+
+      if (!userId) {
+        return;
+      }
       try {
         // Prepare payload
         const payload = {
@@ -340,6 +348,7 @@ export default function AddUsers() {
           lga: formData.localGovernment,
           phone: formData.phoneNumber,
           photo: formData.passport, // Base64 string
+          ambassadorId: userId,
         };
 
         console.log("Payload to be sent:", payload);
