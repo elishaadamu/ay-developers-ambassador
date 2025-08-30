@@ -110,7 +110,7 @@ export default function Home() {
       );
 
       console.log("Account Balance:", response.data);
-      setBalance(response.data.walletBalance ?? 0); // save balance to state
+      setBalance(response.data.data.walletBalance ?? 0); // save balance to state
     } catch (error) {
       console.error("Error fetching account balance:", error);
       message.error("Failed to fetch account balance");
