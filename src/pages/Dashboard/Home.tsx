@@ -99,14 +99,21 @@ export default function Home() {
   const getAccountBalance = async () => {
     setLoading(true);
     try {
-      if (!decryptedUserData) {
-        throw new Error("No user data available");
+      const encryptedUserData = localStorage.getItem("userData");
+      if (!encryptedUserData) {
+        setLoading(false);
+        return;
+      }
+      const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+      const userId = decryptedUserData.id;
+
+      if (!userId) {
+        setLoading(false);
+        return;
       }
 
       const response = await axios.get(
-        `${apiUrl(API_CONFIG.ENDPOINTS.AUTH.getAccountBalance)}${
-          JSON.parse(decryptedUserData).id
-        }`
+        `${apiUrl(API_CONFIG.ENDPOINTS.AUTH.getAccountBalance)}${userId}`
       );
 
       console.log("Account Balance:", response.data);
@@ -121,9 +128,21 @@ export default function Home() {
 
   // Fetch tickets from API
   const fetchTickets = async () => {
+    const encryptedUserData = localStorage.getItem("userData");
+    if (!encryptedUserData) {
+      setLoading(false);
+      return;
+    }
+    const decryptedUserData: { id: string } = decryptData(encryptedUserData);
+    const userId = decryptedUserData.id;
+
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await axios.get(
-        apiUrl(API_CONFIG.ENDPOINTS.AUTH.GetTickets)
+        apiUrl(`${API_CONFIG.ENDPOINTS.AUTH.getTickets}${userId}`)
       );
       setTickets(response.data.tickets || response.data || []);
     } catch (error) {
