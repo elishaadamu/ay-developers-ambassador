@@ -8,7 +8,7 @@ import { apiUrl, API_CONFIG } from "../../utilities/config";
 
 export default function MonthlySalesChart() {
   const [userData, setUserData] = useState<any>(null);
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<any[] | null>(null);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -132,12 +132,7 @@ export default function MonthlySalesChart() {
     },
   };
 
-  const series = [
-    {
-      name: "Sales",
-      data: chartData?.sales || [0, 0, 0, 0, 2, 8, 34, 20, 0, 0, 20, 10],
-    },
-  ];
+  const series = chartData ? chartData.map((s) => ({ name: s.name, data: s.data })) : [];
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
