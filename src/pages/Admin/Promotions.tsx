@@ -11,7 +11,6 @@ import {
   Table,
   Tabs,
   Badge,
-  message,
   Switch,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";

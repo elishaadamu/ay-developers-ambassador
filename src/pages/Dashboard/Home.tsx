@@ -56,13 +56,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
 
-  const encryptedUserData = localStorage.getItem("userData");
-
-  let decryptedUserData: string | null = null;
-  if (encryptedUserData !== null) {
-    decryptedUserData = decryptData(encryptedUserData);
-  }
-
   useEffect(() => {
     // Decrypt and load user data when component mounts
     try {
